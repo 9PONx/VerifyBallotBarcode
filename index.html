@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="th" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Ballot Decoder (JS Logic)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; font-family: 'Sarabun', sans-serif; }
+        .result-card { display: none; margin-top: 20px; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tab-pane { padding-top: 20px; }
+        .valid-badge { background-color: #198754; color: white; padding: 10px; border-radius: 8px; text-align: center; }
+        .invalid-badge { background-color: #dc3545; color: white; padding: 10px; border-radius: 8px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg border-bottom border-body">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#"><i class="fas fa-vote-yea me-2"></i>Verify Barcode</a>
+        <button class="btn btn-outline-secondary" id="themeToggle">
+            <i class="fas fa-moon"></i> Dark Mode
+        </button>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="decode-tab" data-bs-toggle="tab" data-bs-target="#decode-pane" type="button"><i class="fas fa-barcode me-2"></i>Pure Base36 Input</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="encode-tab" data-bs-toggle="tab" data-bs-target="#encode-pane" type="button"><i class="fas fa-list-ol me-2"></i>Pure Local Input</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="verify-tab" data-bs-toggle="tab" data-bs-target="#verify-pane" type="button"><i class="fas fa-check-double me-2"></i>Verify Match</button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content" id="myTabContent">
+                
+                <div class="tab-pane fade show active" id="decode-pane">
+                    <h5 class="card-title mb-3">แปลง Barcode เป็นเลขที่บัตร</h5>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Barcode (5 หลัก)</span>
+                        <input type="text" class="form-control" id="inputBase36" placeholder="เช่น I4SR8, EH1RQ" maxlength="5" style="text-transform:uppercase">
+                        <button class="btn btn-primary" onclick="runDecode()">คำนวณ</button>
+                    </div>
+                    
+                    <div id="resultDecode" class="card result-card border-info">
+                        <div class="card-header bg-info text-dark">ผลลัพธ์การถอดรหัส</div>
+                        <div class="card-body">
+                            <h3 class="text-center text-info" id="outLocalID">...</h3>
+                            <hr>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <small class="text-muted">เล่มที่</small>
+                                    <h5 id="outBook">...</h5>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">ใบที่</small>
+                                    <h5 id="outSheet">...</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="encode-pane">
+                    <h5 class="card-title mb-3">แปลงเลขที่บัตร เป็น Barcode</h5>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Local ID (เลขที่)</span>
+                        <input type="number" class="form-control" id="inputLocal" placeholder="เช่น 01735041">
+                        <button class="btn btn-warning" onclick="runEncode()">คำนวณ</button>
+                    </div>
+
+                    <div id="resultEncode" class="card result-card border-warning">
+                        <div class="card-header bg-warning text-dark">ผลลัพธ์การเข้ารหัส</div>
+                        <div class="card-body text-center">
+                            <h6 class="text-muted">Barcode ที่ถูกต้องคือ</h6>
+                            <h1 class="display-4 text-warning" id="outBarcode">...</h1>
+                            <p class="text-muted small" id="encodeDebug"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="verify-pane">
+                    <h5 class="card-title mb-3">ตรวจสอบความถูกต้อง (Cross Check)</h5>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Barcode (จากบัตร)</label>
+                            <input type="text" class="form-control" id="verifyBase36" placeholder="I4SR8" style="text-transform:uppercase">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Local ID (จากต้นขั้ว)</label>
+                            <input type="number" class="form-control" id="verifyLocal" placeholder="01735041">
+                        </div>
+                    </div>
+                    <button class="btn btn-success w-100 mt-3" onclick="runVerify()">ตรวจสอบความสัมพันธ์</button>
+
+                    <div id="resultVerify" class="card result-card">
+                        <div class="card-body" id="verifyBody">
+                            </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-secondary mt-3 small">
+        <i class="fas fa-info-circle"></i> <strong>Logic Reference:</strong> Uses JS Logic (mult/i loop) with Constants: MOD_SERIAL=10^8, K_MULTIPLIER=32216237, K_OFFSET=42413113.
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // ==========================================
+    // 1. CONSTANTS & CONFIG
+    // ==========================================
+    const BASE36 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const MOD_SERIAL = 100000000;
+    const K_MULTIPLIER = 32216237;
+    const K_OFFSET = 42413113;
+    const MAX_N = 60466176; // 36^5
+
+    // ==========================================
+    // 2. HELPER FUNCTIONS
+    // ==========================================
+    
+    // Format Serial: Pad with zeros to 8 digits (e.g., 1735041 -> "01735041")
+    function formatSerial(num) {
+        return num.toString().padStart(8, '0');
+    }
+
+    // Convert Int to Base36 String (Fixed Length)
+    function toBase36(num, length = 5) {
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result = BASE36[num % 36] + result;
+            num = Math.floor(num / 36);
+        }
+        return result;
+    }
+
+    // Convert Base36 String to Int
+    function fromBase36(str) {
+        let val = 0;
+        for (let char of str) {
+            val = val * 36 + BASE36.indexOf(char);
+        }
+        return val;
+    }
+
+    // ==========================================
+    // 3. CORE LOGIC
+    // ==========================================
+
+    // --- DECODE LOGIC (Base36 -> Local) ---
+    function decodeLogic(barcode) {
+        barcode = barcode.toUpperCase().trim();
+        if (barcode.length !== 5) return null;
+
+        // 1. Base36 -> Int (n)
+        let n = fromBase36(barcode);
+
+        // 2. Find k based on char at index 1
+        let charIndex = BASE36.indexOf(barcode[1]);
+        let k = (K_MULTIPLIER * charIndex + K_OFFSET) % MOD_SERIAL;
+
+        // 3. Calculate Serial
+        let serial = (n + k) % MOD_SERIAL;
+        
+        return serial;
+    }
+
+    // --- ENCODE LOGIC (Local -> Base36) ---
+    function encodeLogic(serial) {
+        serial = parseInt(serial);
+        
+        // Brute force 'mult' and 'i' to find matching conditions
+        for (let mult = 0; mult < 3; mult++) {
+            let x = serial + (mult * MOD_SERIAL);
+            
+            for (let i = 0; i < 36; i++) {
+                // 1. Calculate k
+                let k = (K_MULTIPLIER * i + K_OFFSET) % MOD_SERIAL;
+                
+                // 2. Calculate n
+                let n = x - k;
+                
+                // 3. Check Range (0 <= n < MAX_N)
+                if (n >= 0 && n < MAX_N) {
+                    let qr = toBase36(n);
+                    
+                    // 4. Check Checksum (Char at index 1 must match i)
+                    if (BASE36.indexOf(qr[1]) === i) {
+                        return { barcode: qr, mult: mult, i: i, k: k };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ==========================================
+    // 4. UI HANDLERS
+    // ==========================================
+
+    function runDecode() {
+        const input = document.getElementById('inputBase36').value;
+        const serial = decodeLogic(input);
+        const resDiv = document.getElementById('resultDecode');
+
+        if (serial !== null) {
+            // Updated: Format with padding, no commas
+            const formattedSerial = formatSerial(serial);
+            
+            document.getElementById('outLocalID').innerText = "Local ID: " + "B"+formattedSerial;
+            
+            // Calculate Book & Sheet
+            let book = Math.floor((serial - 1) / 20) + 1;
+            let sheet = ((serial - 1) % 20) + 1;
+
+            // Updated: Format Book with padding (optional, kept similar logic)
+            document.getElementById('outBook').innerText = "B" + formatSerial(book);
+            document.getElementById('outSheet').innerText = sheet;
+            resDiv.style.display = 'block';
+        } else {
+            alert("รูปแบบ Barcode ไม่ถูกต้อง (ต้องมี 5 หลัก)");
+            resDiv.style.display = 'none';
+        }
+    }
+
+    function runEncode() {
+        const input = document.getElementById('inputLocal').value;
+        if(!input) return;
+        
+        const result = encodeLogic(input);
+        const resDiv = document.getElementById('resultEncode');
+        
+        if (result) {
+            document.getElementById('outBarcode').innerText = result.barcode;
+            document.getElementById('encodeDebug').innerText = `(Debug: mult=${result.mult}, i=${result.i}, k=${result.k})`;
+            resDiv.style.display = 'block';
+        } else {
+            alert("ไม่สามารถสร้าง Barcode ได้ (อาจเป็นเลขที่ไม่ถูกต้องตามเงื่อนไข)");
+            resDiv.style.display = 'none';
+        }
+    }
+
+    function runVerify() {
+        const barcode = document.getElementById('verifyBase36').value.toUpperCase().trim();
+        const localInput = document.getElementById('verifyLocal').value.trim();
+        const resDiv = document.getElementById('resultVerify');
+        const resBody = document.getElementById('verifyBody');
+
+        if(!barcode || !localInput) {
+            alert("กรุณากรอกข้อมูลให้ครบทั้ง 2 ช่อง");
+            return;
+        }
+
+        // Strategy: Decode barcode and check if matches local
+        const decodedSerial = decodeLogic(barcode);
+        
+        // Updated: Compare using formatted strings to handle leading zeros input
+        const decodedFormatted = formatSerial(decodedSerial);
+        const inputFormatted = formatSerial(parseInt(localInput));
+
+        resDiv.style.display = 'block';
+        
+        if (decodedFormatted === inputFormatted) {
+            resDiv.className = "card result-card border-success";
+            resBody.innerHTML = `
+                <div class="valid-badge">
+                    <h1><i class="fas fa-check-circle"></i> ถูกต้อง (MATCH)</h1>
+                    <p class="mb-0">Barcode <strong>${barcode}</strong> ตรงกับ Local ID <strong>${decodedFormatted}</strong></p>
+                </div>
+            `;
+        } else {
+            resDiv.className = "card result-card border-danger";
+            resBody.innerHTML = `
+                <div class="invalid-badge">
+                    <h1><i class="fas fa-times-circle"></i> ไม่ถูกต้อง (MISMATCH)</h1>
+                    <p class="mb-0">Barcode <strong>${barcode}</strong> ถอดได้ <strong>${decodedFormatted}</strong></p>
+                    <p class="mb-0 small">(ซึ่งไม่ตรงกับ ${inputFormatted})</p>
+                </div>
+            `;
+        }
+    }
+
+    // ==========================================
+    // 5. THEME TOGGLE LOGIC
+    // ==========================================
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+    const icon = themeToggle.querySelector('i');
+
+    // Load saved theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    htmlEl.setAttribute('data-bs-theme', savedTheme);
+    updateIcon(savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = htmlEl.getAttribute('data-bs-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        htmlEl.setAttribute('data-bs-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateIcon(newTheme);
+    });
+
+    function updateIcon(theme) {
+        if (theme === 'dark') {
+            icon.className = 'fas fa-moon';
+            themeToggle.innerHTML = '<i class="fas fa-moon"></i> Dark Mode';
+            themeToggle.className = 'btn btn-outline-light';
+        } else {
+            icon.className = 'fas fa-sun';
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i> Light Mode';
+            themeToggle.className = 'btn btn-outline-dark';
+        }
+    }
+</script>
+
+</body>
+</html>
