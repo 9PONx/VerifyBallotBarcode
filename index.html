@@ -58,11 +58,15 @@
                             <h3 class="text-center text-info" id="outLocalID">...</h3>
                             <hr>
                             <div class="row text-center">
-                                <div class="col-6">
+                                <div class="col-4">
                                     <small class="text-muted">เล่มที่</small>
                                     <h5 id="outBook">...</h5>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-4">
+                                    <small class="text-muted">เลขที่</small>
+                                    <h5 id="BookNo">...</h5>
+                                </div>
+                                <div class="col-4">
                                     <small class="text-muted">ใบที่</small>
                                     <h5 id="outSheet">...</h5>
                                 </div>
@@ -230,6 +234,7 @@
 
             // Updated: Format Book with padding (optional, kept similar logic)
             document.getElementById('outBook').innerText = "B" + formatSerial(book);
+            document.getElementById('BookNo').innerText = "B" + formatSerial(formattedSerial);
             document.getElementById('outSheet').innerText = sheet;
             resDiv.style.display = 'block';
         } else {
